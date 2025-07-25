@@ -3,12 +3,15 @@ package org.example.controller;
 import org.example.dto.AuthRequest;
 import org.example.dto.AuthResponse;
 import org.example.model.User;
+import org.example.security.CustomUserDetailsService;
 import org.example.security.JWTService;
 import org.example.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.Optional;
 
 @RestController
@@ -21,14 +24,18 @@ public class UserController {
     @Autowired
     private JWTService jwtService;
 
+    @Autowired
+    private CustomUserDetailsService customUserDetailsService;
+
     @PostMapping("/login")
-    public AuthResponse login(@RequestBody AuthRequest request) {
+    public ResponseEntity<?> login(@RequestBody AuthRequest request) {
         Optional<User> user = userService.authenticate(request.getUsername(), request.getPassword());
         if (user.isPresent()) {
-            String token = jwtService.generateToken(user.get().getUsername());
-            return new AuthResponse(token);
+            UserDetails userDetails = customUserDetailsService.loadUserByUsername(user.get().getUsername());
+            String token = jwtService.generateToken(userDetails.getUsername());
+            return ResponseEntity.ok(new AuthResponse(token));
         } else {
-            throw new RuntimeException("Invalid credentials");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
         }
     }
 
@@ -45,7 +52,6 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error occurred during registration");
         }
     }
-
 
     @GetMapping("/user/{username}")
     public Optional<User> getUser(@PathVariable String username) {
